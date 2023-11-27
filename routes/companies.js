@@ -19,12 +19,20 @@ router.get("/", async (req,res, next) => {
 router.get("/:code", async (req,res,next) => {
     try {
         const {code } = req.params;
-        const results = await db.query("SELECT companies.code, companies.name, companies.description, JSON_BUILD_OBJECT('id',invoices.id, 'amt',invoices.amt,'paid',invoices.paid,'add_date',invoices.add_date, 'paid_date',invoices.paid_date) as invoices FROM companies JOIN invoices ON companies.code = invoices.comp_code WHERE code = $1", [code]);
+        // const results = await db.query("SELECT companies.code, companies.name, companies.description, JSON_BUILD_OBJECT('id',invoices.id, 'amt',invoices.amt,'paid',invoices.paid,'add_date',invoices.add_date, 'paid_date',invoices.paid_date) as invoices FROM companies JOIN invoices ON companies.code = invoices.comp_code WHERE code = $1", [code]);
+
+        const companyResults = await db.query("SELECT companies.code, companies.name, companies.description FROM companies WHERE code = $1", [code]);
+
+        const invoiceResults = await db.query("SELECT * FROM invoices WHERE comp_code = $1", [code])
+
 
         // Throw 404 error if no company found
-        if(results.rows.length == 0){ throw new ExpressError(`No company with code "${code}"`, 404)}
+        if(companyResults.rows.length == 0){ throw new ExpressError(`No company with code "${code}"`, 404)}
 
-        return res.status(200).send({company: results.rows[0]})
+        const company = companyResults.rows[0]
+        company.invoices = invoiceResults.rows
+
+        return res.status(200).send({company: company})
     } catch(e){
         return next(e)
     }
