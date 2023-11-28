@@ -58,7 +58,7 @@ describe("GET /companies/:code", ()=> {
 
 describe("POST /companies", ()=> {
     test("Create a new company", async () => {
-        const res = await request(app).post('/companies').send({code:'nba', name:'NBA', description:'The national basketball association'})
+        const res = await request(app).post('/companies').send({name:'NBA', description:'The national basketball association'})
 
         expect(res.statusCode).toBe(201)
         expect(res.body).toEqual({

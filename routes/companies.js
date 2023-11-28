@@ -2,6 +2,7 @@ const express = require('express');
 const ExpressError = require('../expressError')
 const router = express.Router();
 const db = require('../db')
+const slugify = require('slugify')
 
 // GET all companies
 router.get("/", async (req,res, next) => {
@@ -18,19 +19,34 @@ router.get("/", async (req,res, next) => {
 // GET a single company by :code
 router.get("/:code", async (req,res,next) => {
     try {
-        const {code } = req.params;
-        // const results = await db.query("SELECT companies.code, companies.name, companies.description, JSON_BUILD_OBJECT('id',invoices.id, 'amt',invoices.amt,'paid',invoices.paid,'add_date',invoices.add_date, 'paid_date',invoices.paid_date) as invoices FROM companies JOIN invoices ON companies.code = invoices.comp_code WHERE code = $1", [code]);
+        // const {code} = ;
 
-        const companyResults = await db.query("SELECT companies.code, companies.name, companies.description FROM companies WHERE code = $1", [code]);
+        // OLD
+        // const companyResults = await db.query("SELECT companies.code, companies.name, companies.description FROM companies WHERE code = $1", [code]);
 
-        const invoiceResults = await db.query("SELECT * FROM invoices WHERE comp_code = $1", [code])
+        const invoiceResults = await db.query("SELECT * FROM invoices WHERE comp_code = $1", [req.params.code])
+
+        //NEW
+        const companyResults = await db.query(`
+            SELECT c.code, c.name, c.description, i.industry as industries
+            FROM companies c
+            JOIN industries_companies ic
+            ON c.code = ic.company_code
+            JOIN industries i
+            ON ic.industry_code = i.code
+            WHERE c.code = $1`,[req.params.code])
+        //returns multiple rows
+        const {code, name, description} = companyResults.rows[0]
+        console.log('companyResults',companyResults)
+        const industries = companyResults.rows.map(r=> r.industries)
 
 
         // Throw 404 error if no company found
         if(companyResults.rows.length == 0){ throw new ExpressError(`No company with code "${code}"`, 404)}
 
-        const company = companyResults.rows[0]
+        const company = {code, name, description}
         company.invoices = invoiceResults.rows
+        company.industries = industries
 
         return res.status(200).send({company: company})
     } catch(e){
@@ -38,10 +54,16 @@ router.get("/:code", async (req,res,next) => {
     }
 })
 
+
+
+
+
+
 // POST a new copmany, return the new company
 router.post("/", async (req,res,next) => {
     try {
-        const {code, name, description} = req.body;
+        const {name, description} = req.body;
+        let code = slugify(name, {lower:true})
         const results = await db.query("INSERT INTO companies (code, name, description) VALUES ($1, $2, $3) RETURNING *", [code,name,description]);
 
         return res.status(201).json({company: results.rows[0]})
@@ -68,6 +90,9 @@ router.put("/:code", async (req,res,next) => {
         return next(e)
     }
 })
+
+
+
 
 
 // DELETE a company. 404 if no company
